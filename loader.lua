@@ -1,17 +1,20 @@
 -- ============================================================
 --  ELITE HUB | Fort Blox — LOADER
 --  Загружает актуальный скрипт напрямую с GitHub.
---  Использование: вставь этот файл в executor и запусти (F5 / Execute).
+--  Использование: вставь этот файл в executor и запусти (Execute).
 -- ============================================================
 
 local URL = "https://raw.githubusercontent.com/blegbot1/EliteHub-FortBlox/refs/heads/main/EliteHub.lua"
 
--- защита от двойного запуска в одной сессии
-if getgenv().ELITE_HUB_LOADED then
-    warn("[ELITE HUB] уже загружен в этой сессии")
+-- защита только от случайного двойного запуска (5 секунд),
+-- чтобы можно было спокойно перезапустить лоадер после обновления
+local g = getgenv()
+local now = os.clock()
+if g.ELITE_HUB_LOADED_AT and (now - g.ELITE_HUB_LOADED_AT) < 5 then
+    warn("[ELITE HUB] только что запущен, подожди 5 сек")
     return
 end
-getgenv().ELITE_HUB_LOADED = true
+g.ELITE_HUB_LOADED_AT = now
 
 print("[ELITE HUB] загрузка:", URL)
 
@@ -28,7 +31,7 @@ local ok, err = pcall(function()
 end)
 
 if not ok then
-    getgenv().ELITE_HUB_LOADED = nil
+    g.ELITE_HUB_LOADED_AT = nil
     warn("[ELITE HUB] ошибка загрузки:", err)
     error("[ELITE HUB] не удалось загрузить скрипт: " .. tostring(err))
 end
