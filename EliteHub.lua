@@ -148,9 +148,19 @@ local Window = Rayfield:CreateWindow({
 
 -- smooth purple gradient on the topbar background ONLY (no icons/inputs)
 pcall(function()
-    local main = Rayfield.Main
-    if not main then return end
-    local topbar = main:FindFirstChild("Topbar")
+    local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if not pg then return end
+    -- Rayfield's ScreenGui comes from GetObjects(), so find it by structure, not by name
+    local topbar = nil
+    for _, g in ipairs(pg:GetChildren()) do
+        if g:IsA("ScreenGui") then
+            local m = g:FindFirstChild("Main", true)
+            if m then
+                local tb = m:FindFirstChild("Topbar")
+                if tb then topbar = tb break end
+            end
+        end
+    end
     if not topbar then return end
     local targets = {topbar}
     for _, child in ipairs(topbar:GetChildren()) do
