@@ -2182,7 +2182,7 @@ task.spawn(function()
     end
 end)
 
--- ===== TP all players to me: they land behind me and follow =====
+-- ===== TP all players to me: they land in front of me and follow =====
 getgenv().FB_TPAll = false
 getgenv().FB_TPDist = 12
 
@@ -2197,7 +2197,7 @@ MiscTab:CreateToggle({
 })
 
 MiscTab:CreateSlider({
-    Name = "TP distance behind",
+    Name = "TP distance in front",
     Range = {5, 60},
     Increment = 1,
     CurrentValue = 12,
@@ -2205,6 +2205,34 @@ MiscTab:CreateSlider({
         getgenv().FB_TPDist = Value
     end,
 })
+
+-- is there ground under a point? (protects from teleporting anyone into the void)
+local tpGroundCache, tpGroundAt = {}, 0
+local function groundBelow(pos)
+    local now = os.clock()
+    if now - tpGroundAt > 0.25 then
+        tpGroundCache = {}
+        tpGroundAt = now
+    end
+    local key = math.floor(pos.X) .. "," .. math.floor(pos.Y) .. "," .. math.floor(pos.Z)
+    if tpGroundCache[key] ~= nil then
+        return tpGroundCache[key]
+    end
+    local ok, hit = pcall(function()
+        local params = RaycastParams.new()
+        local ch = LocalPlayer.Character
+        if ch then params.FilterDescendantsInstances = {ch} end
+        params.IgnoreWater = true
+        local res = workspace:Raycast(pos + Vector3.new(0, 25, 0), Vector3.new(0, -60, 0), params)
+        return res ~= nil
+    end)
+    if not ok then return true end
+    tpGroundCache[key] = hit
+    return hit
+end
+
+-- don't grab anyone right after our own spawn (character physics still settling)
+local tpLastChar, tpSpawnAt = nil, 0
 
 task.spawn(function()
     while true do
@@ -2215,10 +2243,18 @@ task.spawn(function()
                 local myHRP = ch and ch:FindFirstChild("HumanoidRootPart")
                 local myHum = ch and ch:FindFirstChildOfClass("Humanoid")
                 if not myHRP or not myHum or myHum.Health <= 0 then return end
+                if tpLastChar ~= ch then
+                    tpLastChar = ch
+                    tpSpawnAt = os.clock()
+                    return -- first tick after our respawn: hands off
+                end
+                if os.clock() - tpSpawnAt < 1.5 then return end
                 local dist = getgenv().FB_TPDist or 12
-                -- ONE spot behind my back, it moves with me -> they follow in a crowd
-                local behind = (myHRP.CFrame * CFrame.new(0, 0, dist)).Position
-                local spot = Vector3.new(behind.X, myHRP.Position.Y + 2, behind.Z)
+                -- ONE spot IN FRONT of me, it moves with me -> they follow in a crowd
+                local front = (myHRP.CFrame * CFrame.new(0, 0, -dist)).Position
+                local spot = Vector3.new(front.X, myHRP.Position.Y + 2, front.Z)
+                -- skip if that spot hangs over the void (that's what killed us before)
+                if not groundBelow(spot) then return end
                 local i = 0
                 for _, p in ipairs(Players:GetPlayers()) do
                     if p ~= LocalPlayer then
@@ -2227,13 +2263,14 @@ task.spawn(function()
                         local hum = c and c:FindFirstChildOfClass("Humanoid")
                         if hrp and hum and hum.Health > 0 then
                             i = i + 1
-                            -- small ring offset so they stand AROUND the spot, not inside each other
-                            local ang = (i * 2.4)
-                            local off = Vector3.new(math.cos(ang) * 2, 0, math.sin(ang) * 2)
+                            -- golden-angle ring: wide, nobody stands inside anybody else
+                            local ang = i * 2.39996
+                            local ring = 3 + (i % 3) * 1.6
+                            local off = Vector3.new(math.cos(ang) * ring, 0, math.sin(ang) * ring)
                             local dest = spot + off
                             -- only pull them if they drifted (lets them walk a bit, then snap back)
                             local dSpot = (hrp.Position - dest).Magnitude
-                            if dSpot > 4 then
+                            if dSpot > 5 and groundBelow(dest) then
                                 pcall(function()
                                     hrp.Velocity = Vector3.zero
                                     hrp.RotVelocity = Vector3.zero
