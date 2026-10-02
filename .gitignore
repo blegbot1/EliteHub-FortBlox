@@ -1,0 +1,23 @@
+# Roblox / Luau
+*.rbxl
+*.rbxlx
+*.rbxm
+*.rbxmx
+*.rbxl.lock
+
+# Executor / decompiler dumps
+fb_obf.lua
+fb_t.lua
+fb_decode*.lua
+fb_xor.lua
+fb_runner*.lua
+fb_build_runner*.lua
+fb_payload.txt
+fb_payload*.txt
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
