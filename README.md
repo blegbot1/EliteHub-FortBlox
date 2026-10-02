@@ -52,9 +52,21 @@
 
 ## Установка
 
+### Вариант 1 — лоадер (всегда свежая версия)
+
 1. Открой **Executor** (используется проверенный: Real 2.7.0)
-2. Вставь содержимое `EliteHub.lua` и запусти
-3. Скрипт сам подгружает Rayfield через `HttpGet` — интернет нужен при первом запуске
+2. Вставь содержимое **`loader.lua`** и запусти — он сам скачает актуальный `EliteHub.lua` с GitHub
+3. Один лоадер на все обновления: пуш в репозиторий → перезапуск лоадера → новая версия
+
+Ссылка, которую тянет лоадер:
+
+```
+https://raw.githubusercontent.com/blegbot1/EliteHub-FortBlox/refs/heads/main/EliteHub.lua
+```
+
+### Вариант 2 — вручную
+
+Скопируй `EliteHub.lua` в executor и запусти. Скрипт подгружает Rayfield через `HttpGet` — интернет нужен при первом запуске.
 
 ## Управление
 
@@ -71,6 +83,7 @@
 ```
 EliteHub-FortBlox/
 ├── EliteHub.lua   # весь скрипт (одним файлом, ~2500 строк)
+├── loader.lua     # лоадер: тянет EliteHub.lua с raw.githubusercontent
 ├── README.md
 └── .gitignore
 ```

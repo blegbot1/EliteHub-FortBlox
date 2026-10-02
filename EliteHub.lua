@@ -1,6 +1,11 @@
--- Fort Blox (8884043854) | ESP (lines + chams + box) + Silent Aim + Misc | Rayfield
--- Aiming is client-side (silent): the original shot is replaced in the __namecall
--- hook, no camera movement, no visible aimbot needed.
+-- ============================================================
+--  ELITE HUB | Fort Blox (place 8884043854)
+--  ESP (lines + chams + 3D box) + Silent Aim (client) + Misc
+--  Repo: https://github.com/blegbot1/EliteHub-FortBlox
+--
+--  Aiming is client-side (silent): the original shot is replaced in the __namecall
+--  hook, no camera movement, no visible aimbot needed.
+-- ============================================================
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
