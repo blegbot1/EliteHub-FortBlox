@@ -35,6 +35,8 @@
 - **Triggerbot** + задержка
 - **Wall check** — выключен = стреляет сквозь стены
 - **Skip squadmates** — сквадмейтов не бьём (сервер всё равно не даёт урон)
+- **Kill All** — авто-выстрел по ближайшему врагу в радиусе пушки; слайдер `gap` (0.1–2 с) — темп стрельбы; друзья и сквадмейты не трогаются, wall check общий с аимом
+- **No Spread** — обнуляет spread/bloom/cone/deviation в клиентском `Config`-модуле и атрибутах оружия (раз в секунду для экипированной пушки)
 - Статус в реальном времени: `HOOK: on/off | TARGET: ник м / searching... / ERR: ...`
 
 ### Friends
@@ -44,6 +46,7 @@
 ### Misc
 - **Speed lock** — Walk / Sprint (Shift) отдельно
 - **Instant chests** (холд = 0) и **Auto open near chest** (только в радиусе 16 м, как требует сервер)
+- **Auto pickup** — сам жмёт ProximityPrompt'ы рядом (4–24 стада, слайдер); сундучные промпты пропускает — у них своя секция
 - **Auto HP / Auto Shield** — берёт хилку в руки, `Init` → `Use`, держит огонь время применения, возвращает пушку
 - **TP all players to me** — все игроки телепортируются на одну точку **перед тобой** и следуют за тобой (кучка), новые спавнятся сразу туда же
   - точка проверяется рейкастом на наличие земли — никого не уносит в пустоту
@@ -99,6 +102,11 @@ EliteHub-FortBlox/
 getgenv().FB_Aim = true
 getgenv().FB_AimFOV = 200
 getgenv().FB_HitPart = "UpperTorso"
+getgenv().FB_KillAll = true        -- авто-стрельба по ближайшему врагу
+getgenv().FB_KillAllGap = 0.3      -- сек между выстрелами
+getgenv().FB_NoSpread = true       -- нулевой разброс
+getgenv().FB_AutoPickup = true     -- авто-подбор промптов
+getgenv().FB_PickupRange = 12      -- стада подбора
 getgenv().FB_Theme.Background = Color3.fromRGB(12, 10, 18)
 ```
 

@@ -89,6 +89,11 @@ getgenv().FB_LockIndicator = true
 getgenv().FB_Friends = getgenv().FB_Friends or {}
 getgenv().FB_FriendESP = true
 getgenv().FB_EnemyGun = true
+getgenv().FB_NoSpread = false
+getgenv().FB_KillAll = false
+getgenv().FB_KillAllGap = 0.3
+getgenv().FB_AutoPickup = false
+getgenv().FB_PickupRange = 12
 
 local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua'))()
 
@@ -1274,6 +1279,106 @@ local function silentFire(head)
     return false, "fire failed"
 end
 
+-- ================= KILL ALL (auto shoot every enemy) =================
+-- One shot per tick at the NEAREST alive enemy in gun range.
+-- Friends/squadmates are skipped, wall check honors the aim toggle.
+task.spawn(function()
+    while true do
+        task.wait(getgenv().FB_KillAllGap or 0.3)
+        if getgenv().FB_KillAll then
+            local okK, errK = pcall(function()
+                local gun = getEquippedGun()
+                if not gun or not ShootRemote then return end
+                local maxD = getGunRange(gun) or 2000
+                local squad = getgenv().FB_SkipSquad and getSquadmates() or {}
+                local hitPartName = getgenv().FB_HitPart or "Head"
+                local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                local cam = workspace.CurrentCamera
+                local best, bestD
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer and not isFriend(p) and not squad[p.Name] then
+                        local ch = p.Character
+                        local part = ch and ch:FindFirstChild(hitPartName)
+                        if not part then part = ch and ch:FindFirstChild("Head") end
+                        local hum = ch and ch:FindFirstChildOfClass("Humanoid")
+                        local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
+                        if part and hum and hum.Health > 0 and hrp then
+                            local d = myHRP and (myHRP.Position - hrp.Position).Magnitude or 0
+                            if d <= maxD and (bestD == nil or d < bestD) then
+                                local clear = wallClear(cam and cam.CFrame.Position or hrp.Position, ch, part.Position)
+                                if clear then
+                                    best, bestD = part, d
+                                end
+                            end
+                        end
+                    end
+                end
+                if best then
+                    silentFire(best)
+                end
+            end)
+            if not okK then
+                getgenv().FB_KillAll = false
+                notify("Kill All off, err: " .. tostring(errK):sub(1, 60), 4)
+            end
+        end
+    end
+end)
+
+-- ================= NO SPREAD (zero client config) =================
+-- Game reads spread from ReplicatedStorage.Modules.Config:GetConfig(gun):
+-- we zero spread-like numeric fields in that shared table (require cache).
+local noSpreadNotified = {}
+local function noSpreadZeroGun(gun)
+    if not gun then return 0 end
+    local n = 0
+    pcall(function()
+        local Config = require(game:GetService("ReplicatedStorage").Modules.Config)
+        local c = Config:GetConfig(gun)
+        if type(c) == "table" then
+            for k, v in pairs(c) do
+                if type(v) == "number" and type(k) == "string" then
+                    local lk = string.lower(k)
+                    if string.find(lk, "spread", 1, true) or string.find(lk, "bloom", 1, true)
+                        or string.find(lk, "cone", 1, true) or string.find(lk, "deviation", 1, true) then
+                        if v ~= 0 then c[k] = 0 n = n + 1 end
+                    end
+                end
+            end
+        end
+    end)
+    -- gun item attributes are the other common place
+    pcall(function()
+        for k, v in pairs(gun:GetAttributes()) do
+            if type(v) == "number" then
+                local lk = string.lower(tostring(k))
+                if string.find(lk, "spread", 1, true) or string.find(lk, "bloom", 1, true)
+                    or string.find(lk, "cone", 1, true) or string.find(lk, "deviation", 1, true) then
+                    if v ~= 0 then gun:SetAttribute(k, 0) n = n + 1 end
+                end
+            end
+        end
+    end)
+    return n
+end
+
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if getgenv().FB_NoSpread then
+            pcall(function()
+                local gun = getEquippedGun()
+                if not gun then return end
+                local n = noSpreadZeroGun(gun)
+                if n > 0 and not noSpreadNotified[gun] then
+                    noSpreadNotified[gun] = true
+                    notify("No Spread: " .. gun.Name .. " (" .. n .. " fields zeroed)", 2)
+                end
+            end)
+        end
+    end
+end)
+
 -- precomputed shot: RenderStepped refreshes it, hook ONLY swaps numbers (nothing throwable inside)
 getgenv().FB_PreShot = nil
 task.spawn(function()
@@ -1671,6 +1776,36 @@ AimTab:CreateSlider({
 })
 
 AimTab:CreateToggle({
+    Name = "Kill All (auto shoot everyone)",
+    CurrentValue = false,
+    Flag = "FB_KillAll",
+    Callback = function(Value)
+        getgenv().FB_KillAll = Value
+        notify("Kill All: " .. (Value and "ON" or "OFF"), 2)
+    end,
+})
+
+AimTab:CreateSlider({
+    Name = "Kill All gap (sec)",
+    Range = {1, 20},
+    Increment = 1,
+    CurrentValue = 3,
+    Callback = function(Value)
+        getgenv().FB_KillAllGap = Value / 10
+    end,
+})
+
+AimTab:CreateToggle({
+    Name = "No Spread (zero weapon spread)",
+    CurrentValue = false,
+    Flag = "FB_NoSpread",
+    Callback = function(Value)
+        getgenv().FB_NoSpread = Value
+        notify("No Spread: " .. (Value and "ON" or "OFF"), 2)
+    end,
+})
+
+AimTab:CreateToggle({
     Name = "Target info panel",
     CurrentValue = true,
     Flag = "FB_TargetPanel",
@@ -2032,6 +2167,26 @@ MiscTab:CreateToggle({
     Callback = function(Value)
         getgenv().FB_ChestNear = Value
         notify("Auto open near: " .. (Value and "ON" or "OFF"), 2)
+    end,
+})
+
+MiscTab:CreateToggle({
+    Name = "Auto pickup (prompts nearby)",
+    CurrentValue = false,
+    Flag = "FB_AutoPickup",
+    Callback = function(Value)
+        getgenv().FB_AutoPickup = Value
+        notify("Auto pickup: " .. (Value and "ON" or "OFF"), 2)
+    end,
+})
+
+MiscTab:CreateSlider({
+    Name = "Pickup range (studs)",
+    Range = {4, 24},
+    Increment = 1,
+    CurrentValue = 12,
+    Callback = function(Value)
+        getgenv().FB_PickupRange = Value
     end,
 })
 
@@ -2453,6 +2608,53 @@ task.spawn(function()
                             ChestRemote:FireServer(true, best)
                         end)
                     end
+                end
+            end)
+        end
+    end
+end)
+
+-- ================= AUTO PICKUP (prompts nearby) =================
+-- Fires any ProximityPrompt within range (NOT chest prompts: chests have their own logic).
+local pickupFired = {}
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if getgenv().FB_AutoPickup then
+            pcall(function()
+                local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+                local dist = getgenv().FB_PickupRange or 12
+                local now = os.clock()
+                for _, d in ipairs(workspace:GetDescendants()) do
+                    if d:IsA("ProximityPrompt") then
+                        -- chest prompts belong to the chest section: skip them here
+                        local anc = d:FindFirstAncestorOfClass("Model") or d.Parent
+                        local inChest = anc and anc.Name == "Chest"
+                        if not inChest and d.Enabled then
+                            local pp = d.Parent
+                            local pos = pp and pp:IsA("BasePart") and pp.Position or nil
+                            if not pos and pp then
+                                pcall(function() pos = pp:GetPivot().Position end)
+                            end
+                            if pos and (hrp.Position - pos).Magnitude <= dist then
+                                local last = pickupFired[d] or 0
+                                if now - last > 2 then
+                                    pcall(function()
+                                        d.HoldDuration = 0
+                                    end)
+                                    pcall(function()
+                                        fireproximityprompt(d)
+                                    end)
+                                    pickupFired[d] = now
+                                    print("[FB Pickup] fired: " .. tostring(d.Parent and d.Parent:GetFullName() or d:GetFullName()))
+                                end
+                            end
+                        end
+                    end
+                end
+                for pr, _ in pairs(pickupFired) do
+                    if not pr.Parent then pickupFired[pr] = nil end
                 end
             end)
         end
